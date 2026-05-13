@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>桌面宠物</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background: transparent;
+      overflow: hidden;
+      user-select: none;
+    }
+
+    #pet-container {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      cursor: pointer;
+    }
+
+    #pet-canvas {
+      width: 100%;
+      height: 100%;
+      image-rendering: pixelated;
+    }
+
+    #greeting-bubble {
+      position: absolute;
+      background-color: rgba(255, 255, 255, 0.9);
+      color: #333;
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-family: "Microsoft YaHei", sans-serif;
+      max-width: 200px;
+      word-wrap: break-word;
+      display: none;
+      pointer-events: none;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    #greeting-bubble::after {
+      content: '';
+      position: absolute;
+      bottom: -8px;
+      left: 50%;
+      transform: translateX(-50%);
+      border-left: 8px solid transparent;
+      border-right: 8px solid transparent;
+      border-top: 8px solid rgba(255, 255, 255, 0.9);
+    }
+
+    #context-menu {
+      position: absolute;
+      background: rgba(30, 30, 30, 0.95);
+      border-radius: 8px;
+      padding: 8px 0;
+      min-width: 150px;
+      display: none;
+      z-index: 1000;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+
+    .menu-item {
+      padding: 8px 16px;
+      cursor: pointer;
+      color: #fff;
+      font-size: 14px;
+      font-family: "Microsoft YaHei", sans-serif;
+      transition: background 0.2s;
+    }
+
+    .menu-item:hover {
+      background: rgba(100, 100, 100, 0.5);
+    }
+
+    .menu-divider {
+      height: 1px;
+      background: rgba(255, 255, 255, 0.1);
+      margin: 4px 0;
+    }
+  </style>
+</head>
+<body>
+  <div id="pet-container">
+    <canvas id="pet-canvas"></canvas>
+  </div>
+  <div id="greeting-bubble"></div>
+  <div id="context-menu">
+    <div class="menu-item" id="menu-jump">跳跃</div>
+    <div class="menu-item" id="menu-move">移动</div>
+    <div class="menu-divider"></div>
+    <div class="menu-item" id="menu-quit">退出</div>
+  </div>
+
+  <script>
+    class DesktopPet {
+      constructor() {
+        this.canvas = document.getElementById('pet-canvas');
+        this.ctx = this.canvas.getContext('2d');
+        this.petContainer = document.getElementById('pet-container');
+        this.greetingBubble = document.getElementById('greeting-bubble');
+        this.contextMenu = document.getElementById('context-menu');
+
+        this.config = null;
+        this.petConfig = null;
+        this.petAssetsPath = '';
+
+        this.frames = {};
+        this.currentState = 'idle';
+        this.currentFrame = 0;
+        this.animationFrameId = null;
+
+        this.isMoving = false;
+        this.moveTargetX = 0;
+        this.moveTargetY = 0;
+        this.moveSpeed = 3;
+
+        this.idleTimer = null;
+        this.idleTimeout = 5000;
+
+        this.greetingTimer = null;
+        this.greetingInterval = 20000;
+        this.greetingHideTimer = null;
+        this.greetingDuration = 3000;
+
+        this.petSize = 64;
+        this.petX = 0;
+        this.petY = 0;
+        this.animationInterval = 150;
+        
+        this.lastAnimationTime = 0;
+        this.lastPositionUpdate = 0;
+
+        this.petContainer.addEventListener('click', (e) => this.onPetClick(e));
+        this.petContainer.addEventListener('contextmenu', (e) => this.onRightClick(e));
+        document.addEventListener('click', () => this.hideContextMenu());
+        
+        document.getElementById('menu-jump').addEventListener('click', () => {
+          this.doJump();
+          this.hideContextMenu();
+        });
+        document.getElementById('menu-move').addEventListener('click', () => {
+          this.autoMove();
+          this.hideContextMenu();
+        });
+        document.getElementById('menu-quit').addEventListener('click', () => {
+          window.electronAPI.quitApp();
+        });
+      }
+
+      async init() {
+        this.config = await window.electronAPI.getGreetingsConfig();
+        this.petAssetsPath = await window.electronAPI.getPetAssetsPath();
+
+        if (this.config) {
+          this.petSize = this.config.pet_size || 64;
+          this.moveSpeed = this.config.move_speed || 3;
+          this.idleTimeout = (this.config.idle_timeout_seconds || 5) * 1000;
+          this.animationInterval = this.config.animation_interval_ms || 150;
+          this.greetingInterval = (this.config.interval_seconds || 30) * 1000;
+          this.greetingDuration = (this.config.display_duration_seconds || 5) * 1000;
+        }
+
+        this.canvas.width = this.petSize;
+        this.canvas.height = this.petSize;
+
+        this.petX = window.screen.width - this.petSize - 20;
+        this.petY = window.screen.height - this.petSize - 100;
+        
+        window.electronAPI.setWindowPosition(this.petX, this.petY);
+
+        this.petConfig = await window.electronAPI.getPetConfig(this.config?.current_pet || 'orange_cat');
+
+        await this.loadFrames();
+
+        this.startAnimation();
+        this.startIdleTimer();
+        this.startGreetingTimer();
+
+        console.log('Pet initialized:', this.petConfig?.name);
+        console.log('Pet size:', this.petSize);
+      }
+
+      async loadFrames() {
+        if (!this.petConfig || !this.petConfig.frames) {
+          return;
+        }
+
+        const basePath = `${this.petAssetsPath}/${this.config?.current_pet || 'orange_cat'}`;
+
+        for (const [state, frameFiles] of Object.entries(this.petConfig.frames)) {
+          this.frames[state] = [];
+          for (const frameFile of frameFiles) {
+            const img = new Image();
+            img.src = `file://${basePath}/${frameFile}`;
+            await new Promise((resolve) => {
+              img.onload = resolve;
+              img.onerror = resolve;
+            });
+            this.frames[state].push(img);
+          }
+        }
+      }
+
+      startAnimation() {
+        this.lastAnimationTime = performance.now();
+        this.lastPositionUpdate = this.lastAnimationTime;
+        this.animate();
+      }
+
+      animate() {
+        const now = performance.now();
+        
+        if (now - this.lastAnimationTime >= this.animationInterval) {
+          this.updateFrame();
+          this.lastAnimationTime = now;
+        }
+
+        this.animationFrameId = requestAnimationFrame(() => this.animate());
+      }
+
+      updateFrame() {
+        const stateFrames = this.frames[this.currentState] || this.frames['idle'] || [];
+        if (stateFrames.length === 0) return;
+
+        this.currentFrame = (this.currentFrame + 1) % stateFrames.length;
+        this.draw();
+
+        if (this.isMoving) {
+          this.moveTowardsTarget();
+        }
+      }
+
+      draw() {
+        const stateFrames = this.frames[this.currentState] || this.frames['idle'] || [];
+        
+        if (stateFrames.length === 0) {
+          this.ctx.fillStyle = 'rgba(255, 165, 0, 0.5)';
+          this.ctx.fillRect(0, 0, this.petSize, this.petSize);
+          return;
+        }
+
+        this.ctx.clearRect(0, 0, this.petSize, this.petSize);
+        const currentImg = stateFrames[this.currentFrame];
+        if (currentImg && currentImg.complete) {
+          this.ctx.drawImage(currentImg, 0, 0, this.petSize, this.petSize);
+        }
+      }
+
+      onPetClick(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        this.doJump();
+      }
+
+      onRightClick(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        this.showContextMenu(e.clientX, e.clientY);
+      }
+
+      showContextMenu(x, y) {
+        this.contextMenu.style.left = x + 'px';
+        this.contextMenu.style.top = y + 'px';
+        this.contextMenu.style.display = 'block';
+      }
+
+      hideContextMenu() {
+        this.contextMenu.style.display = 'none';
+      }
+
+      doJump() {
+        if (this.currentState === 'jump') return;
+
+        this.currentState = 'jump';
+        this.currentFrame = 0;
+        this.isMoving = false;
+
+        this.moveTargetX = Math.random() * (window.screen.width - this.petSize);
+        this.moveTargetY = Math.random() * (window.screen.height - this.petSize);
+
+        console.log('Jump! Target:', this.moveTargetX, this.moveTargetY);
+
+        setTimeout(() => {
+          if (!this.frames['walk'] || this.frames['walk'].length === 0) {
+            this.currentState = 'idle';
+          } else {
+            this.currentState = 'walk';
+            this.isMoving = true;
+          }
+        }, 500);
+      }
+
+      moveTowardsTarget() {
+        const dx = this.moveTargetX - this.petX;
+        const dy = this.moveTargetY - this.petY;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+
+        if (distance < this.moveSpeed) {
+          this.petX = this.moveTargetX;
+          this.petY = this.moveTargetY;
+          this.isMoving = false;
+          this.currentState = 'idle';
+          window.electronAPI.setWindowPosition(this.petX, this.petY);
+          return;
+        }
+
+        const step = this.moveSpeed;
+        this.petX += (dx / distance) * step;
+        this.petY += (dy / distance) * step;
+
+        const now = performance.now();
+        if (now - this.lastPositionUpdate >= 16) {
+          window.electronAPI.setWindowPosition(this.petX, this.petY);
+          this.lastPositionUpdate = now;
+        }
+
+        this.updateBubblePosition();
+      }
+
+      startIdleTimer() {
+        if (this.idleTimer) {
+          clearInterval(this.idleTimer);
+        }
+        this.idleTimer = setInterval(() => this.autoMove(), this.idleTimeout);
+      }
+
+      autoMove() {
+        if (this.isMoving || this.currentState === 'jump') return;
+
+        this.currentState = 'walk';
+        this.isMoving = true;
+
+        this.moveTargetX = Math.random() * (window.screen.width - this.petSize);
+        this.moveTargetY = Math.random() * (window.screen.height - this.petSize);
+
+        console.log('Auto move to:', this.moveTargetX, this.moveTargetY);
+      }
+
+      startGreetingTimer() {
+        if (this.greetingTimer) {
+          clearInterval(this.greetingTimer);
+        }
+        this.greetingTimer = setInterval(() => this.showRandomGreeting(), this.greetingInterval);
+      }
+
+      getTimePeriod() {
+        const hour = new Date().getHours();
+        if (hour >= 20 || hour < 5) return 'night';
+        if (hour < 11.5) return 'morning';
+        if (hour < 13.5) return 'noon';
+        if (hour < 18) return 'afternoon';
+        return 'evening';
+      }
+
+      showRandomGreeting() {
+        if (!this.config || !this.config.greetings) return;
+
+        const period = this.getTimePeriod();
+        const periodGreetings = this.config.greetings[period] || this.config.greetings['morning'] || [];
+        if (periodGreetings.length === 0) return;
+
+        const greeting = periodGreetings[Math.floor(Math.random() * periodGreetings.length)];
+        console.log('Show greeting (' + period + '):', greeting);
+
+        this.greetingBubble.textContent = greeting;
+        this.greetingBubble.style.display = 'block';
+
+        this.updateBubblePosition();
+
+        if (this.greetingHideTimer) {
+          clearTimeout(this.greetingHideTimer);
+        }
+        this.greetingHideTimer = setTimeout(() => {
+          this.greetingBubble.style.display = 'none';
+        }, this.greetingDuration);
+      }
+
+      updateBubblePosition() {
+        const bubbleX = this.petX + this.petSize / 2 - 100;
+        const bubbleY = this.petY - 50;
+        this.greetingBubble.style.left = bubbleX + 'px';
+        this.greetingBubble.style.top = bubbleY + 'px';
+      }
+    }
+
+    window.onload = async () => {
+      const pet = new DesktopPet();
+      await pet.init();
+    };
+  </script>
+</body>
+</html>

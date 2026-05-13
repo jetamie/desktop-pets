@@ -1,0 +1,46 @@
+{
+  "name": "desktop-pets",
+  "version": "1.0.0",
+  "description": "桌面宠物应用",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --no-sandbox --disable-gpu-sandbox",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder",
+    "dist:win": "electron-builder --win",
+    "dist:mac": "electron-builder --mac",
+    "dist:linux": "electron-builder --linux"
+  },
+  "keywords": ["desktop", "pet", "electron"],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "electron": "^28.3.3",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.desktoppets.app",
+    "productName": "桌面宠物",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "src/**/*",
+      "index.html",
+      "assets/**/*",
+      "config/**/*"
+    ],
+    "linux": {
+      "target": ["AppImage"],
+      "category": "Utility"
+    },
+    "mac": {
+      "target": ["dmg", "zip"],
+      "category": "public.app-category.utilities"
+    },
+    "win": {
+      "target": ["nsis", "portable"]
+    }
+  }
+}
