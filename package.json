@@ -23,9 +23,11 @@
     "appId": "com.desktoppets.app",
     "productName": "桌面宠物",
     "directories": {
-      "output": "release"
+      "output": "release",
+      "buildResources": "build"
     },
     "publish": null,
+    "icon": "build/icon.png",
     "files": [
       "src/**/*",
       "index.html",
@@ -34,14 +36,17 @@
     ],
     "linux": {
       "target": ["AppImage"],
-      "category": "Utility"
+      "category": "Utility",
+      "icon": "build/icons/icon.png"
     },
     "mac": {
       "target": ["dmg", "zip"],
-      "category": "public.app-category.utilities"
+      "category": "public.app-category.utilities",
+      "icon": "build/icons/icon.icns"
     },
     "win": {
-      "target": ["nsis", "portable"]
+      "target": ["nsis", "portable"],
+      "icon": "build/icons/icon.ico"
     }
   }
 }

@@ -69,13 +69,21 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
 
     - name: Download all artifacts
       uses: actions/download-artifact@v4
 
+    - name: Generate tag name
+      id: generate-tag
+      run: echo "tag_name=v$(date +%Y%m%d)-$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
     - name: Create Release
       uses: softprops/action-gh-release@v2
       with:
+        tag_name: ${{ steps.generate-tag.outputs.tag_name }}
+        name: Release ${{ steps.generate-tag.outputs.tag_name }}
         files: |
           linux-build/*.AppImage
           windows-build/*.exe
