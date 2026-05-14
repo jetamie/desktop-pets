@@ -51,9 +51,9 @@ function createWindow() {
 
   const displays = screen.getAllDisplays();
   const primaryDisplay = screen.getPrimaryDisplay();
-  const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize;
+  const { width: screenWidth, height: screenHeight } = primaryDisplay.size;
 
-  mainWindow.setPosition(screenWidth - petSize - 20, screenHeight - petSize - 100);
+  mainWindow.setPosition(screenWidth - petSize - 20, screenHeight - petSize - 20);
 
   mainWindow.loadFile(path.join(__dirname, '..', 'index.html'));
 

@@ -434,10 +434,12 @@
       }
 
       getTimePeriod() {
-        const hour = new Date().getHours();
+        const now = new Date();
+        const hour = now.getHours();
+        
         if (hour >= 20 || hour < 5) return 'night';
-        if (hour < 11.5) return 'morning';
-        if (hour < 13.5) return 'noon';
+        if (hour < 11 || (hour === 11 && now.getMinutes() < 30)) return 'morning';
+        if (hour < 13 || (hour === 13 && now.getMinutes() < 30)) return 'noon';
         if (hour < 18) return 'afternoon';
         return 'evening';
       }
