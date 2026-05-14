@@ -1,10 +1,10 @@
 {
-  "current_pet": "orange_cat",
+  "current_pet": "totoro",
   "interval_seconds": 20,
   "display_duration_seconds": 3,
-  "move_speed": 2,
+  "move_speed": 3,
   "idle_timeout_seconds": 10,
-  "pet_size": 150,
+  "pet_size": 200,
   "animation_interval_ms": 300,
   "greetings": {
     "morning": [
