@@ -179,7 +179,7 @@
         
         window.electronAPI.setWindowPosition(this.petX, this.petY);
 
-        this.petConfig = await window.electronAPI.getPetConfig(this.config?.current_pet || 'orange_cat');
+        this.petConfig = await window.electronAPI.getPetConfig(this.config && this.config.current_pet ? this.config.current_pet : 'orange_cat');
 
         await this.loadFrames();
 
@@ -187,7 +187,7 @@
         this.startIdleTimer();
         this.startGreetingTimer();
 
-        console.log('Pet initialized:', this.petConfig?.name);
+        console.log('Pet initialized:', this.petConfig && this.petConfig.name ? this.petConfig.name : undefined);
         console.log('Pet size:', this.petSize);
       }
 
@@ -196,7 +196,7 @@
           return;
         }
 
-        const basePath = `${this.petAssetsPath}/${this.config?.current_pet || 'orange_cat'}`;
+        const basePath = `${this.petAssetsPath}/${this.config && this.config.current_pet ? this.config.current_pet : 'orange_cat'}`;
 
         for (const [state, frameFiles] of Object.entries(this.petConfig.frames)) {
           this.frames[state] = [];
@@ -371,7 +371,6 @@
         if (periodGreetings.length === 0) return;
 
         const greeting = periodGreetings[Math.floor(Math.random() * periodGreetings.length)];
-        console.log('Show greeting (' + period + '):', greeting);
 
         this.greetingBubble.textContent = greeting;
         this.greetingBubble.style.display = 'block';
@@ -387,8 +386,8 @@
       }
 
       updateBubblePosition() {
-        const bubbleX = this.petX + this.petSize / 2 - 100;
-        const bubbleY = this.petY - 50;
+        const bubbleX = this.petSize / 2 - 100;
+        const bubbleY = 10;
         this.greetingBubble.style.left = bubbleX + 'px';
         this.greetingBubble.style.top = bubbleY + 'px';
       }
