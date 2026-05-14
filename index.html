@@ -36,27 +36,27 @@
       position: absolute;
       background-color: rgba(255, 255, 255, 0.9);
       color: #333;
-      padding: 8px 12px;
-      border-radius: 8px;
-      font-size: 14px;
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-size: 12px;
       font-family: "Microsoft YaHei", sans-serif;
-      max-width: 200px;
+      max-width: 150px;
       word-wrap: break-word;
       display: none;
       pointer-events: none;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
       border: 1px solid rgba(255, 255, 255, 0.2);
     }
 
     #greeting-bubble::after {
       content: '';
       position: absolute;
-      bottom: -8px;
+      bottom: calc(-1 * var(--arrow-size, 6px));
       left: 50%;
       transform: translateX(-50%);
-      border-left: 8px solid transparent;
-      border-right: 8px solid transparent;
-      border-top: 8px solid rgba(255, 255, 255, 0.9);
+      border-left: var(--arrow-size, 6px) solid transparent;
+      border-right: var(--arrow-size, 6px) solid transparent;
+      border-top: var(--arrow-size, 6px) solid rgba(255, 255, 255, 0.9);
     }
 
     #context-menu {
@@ -133,6 +133,9 @@
         this.greetingHideTimer = null;
         this.greetingDuration = 3000;
 
+        this.jumpedThisHour = false;
+        this.hourJumpTimer = null;
+
         this.petSize = 64;
         this.petX = 0;
         this.petY = 0;
@@ -174,8 +177,13 @@
         this.canvas.width = this.petSize;
         this.canvas.height = this.petSize;
 
-        this.petX = window.screen.width - this.petSize - 20;
-        this.petY = window.screen.height - this.petSize - 100;
+        this.petY = window.screen.height - this.petSize;
+        
+        if (this.isWorkTime()) {
+          this.petX = this.calculateTimePosition();
+        } else {
+          this.petX = window.screen.width - this.petSize - 20;
+        }
         
         window.electronAPI.setWindowPosition(this.petX, this.petY);
 
@@ -186,9 +194,7 @@
         this.startAnimation();
         this.startIdleTimer();
         this.startGreetingTimer();
-
-        console.log('Pet initialized:', this.petConfig && this.petConfig.name ? this.petConfig.name : undefined);
-        console.log('Pet size:', this.petSize);
+        this.startHourJumpTimer();
       }
 
       async loadFrames() {
@@ -237,6 +243,9 @@
         this.draw();
 
         if (this.isMoving) {
+          if (this.isWorkTime()) {
+            this.moveTargetX = this.calculateTimePosition();
+          }
           this.moveTowardsTarget();
         }
       }
@@ -286,10 +295,13 @@
         this.currentFrame = 0;
         this.isMoving = false;
 
-        this.moveTargetX = Math.random() * (window.screen.width - this.petSize);
-        this.moveTargetY = Math.random() * (window.screen.height - this.petSize);
-
-        console.log('Jump! Target:', this.moveTargetX, this.moveTargetY);
+        if (this.isWorkTime()) {
+          this.moveTargetX = this.calculateTimePosition();
+          this.moveTargetY = window.screen.height - this.petSize;
+        } else {
+          this.moveTargetX = Math.random() * (window.screen.width - this.petSize);
+          this.moveTargetY = Math.random() * (window.screen.height - this.petSize);
+        }
 
         setTimeout(() => {
           if (!this.frames['walk'] || this.frames['walk'].length === 0) {
@@ -309,9 +321,16 @@
         if (distance < this.moveSpeed) {
           this.petX = this.moveTargetX;
           this.petY = this.moveTargetY;
-          this.isMoving = false;
-          this.currentState = 'idle';
           window.electronAPI.setWindowPosition(this.petX, this.petY);
+          
+          if (this.isWorkTime()) {
+            this.moveTargetX = this.calculateTimePosition();
+            this.isMoving = true;
+            this.currentState = 'walk';
+          } else {
+            this.isMoving = false;
+            this.currentState = 'idle';
+          }
           return;
         }
 
@@ -338,13 +357,66 @@
       autoMove() {
         if (this.isMoving || this.currentState === 'jump') return;
 
+        if (this.isWorkTime()) {
+          this.timeModeMove();
+        } else {
+          this.wanderModeMove();
+        }
+      }
+
+      wanderModeMove() {
         this.currentState = 'walk';
         this.isMoving = true;
 
         this.moveTargetX = Math.random() * (window.screen.width - this.petSize);
         this.moveTargetY = Math.random() * (window.screen.height - this.petSize);
+      }
 
-        console.log('Auto move to:', this.moveTargetX, this.moveTargetY);
+      timeModeMove() {
+        const targetX = this.calculateTimePosition();
+        const screenHeight = window.screen.height;
+        
+        this.currentState = 'walk';
+        this.isMoving = true;
+        this.moveTargetX = targetX;
+        this.moveTargetY = screenHeight - this.petSize;
+      }
+
+      calculateTimePosition() {
+        const now = new Date();
+        const currentMinutes = now.getHours() * 60 + now.getMinutes();
+        
+        const workStartMinutes = 8 * 60;
+        const workEndMinutes = 18 * 60;
+        const totalWorkMinutes = workEndMinutes - workStartMinutes;
+        
+        let progress;
+        if (currentMinutes < workStartMinutes) {
+          progress = 0;
+        } else if (currentMinutes >= workEndMinutes) {
+          progress = 1;
+        } else {
+          progress = (currentMinutes - workStartMinutes) / totalWorkMinutes;
+        }
+        
+        const screenWidth = window.screen.width;
+        const startX = screenWidth - this.petSize - 20;
+        const endX = 0;
+        
+        return startX - progress * (startX - endX);
+      }
+
+      checkHourJump() {
+        const now = new Date();
+        const minutes = now.getMinutes();
+        const seconds = now.getSeconds();
+        
+        if (minutes === 0 && seconds < 5 && !this.jumpedThisHour) {
+          this.doJump();
+          this.jumpedThisHour = true;
+        } else if (minutes !== 0) {
+          this.jumpedThisHour = false;
+        }
       }
 
       startGreetingTimer() {
@@ -354,6 +426,13 @@
         this.greetingTimer = setInterval(() => this.showRandomGreeting(), this.greetingInterval);
       }
 
+      startHourJumpTimer() {
+        if (this.hourJumpTimer) {
+          clearInterval(this.hourJumpTimer);
+        }
+        this.hourJumpTimer = setInterval(() => this.checkHourJump(), 1000);
+      }
+
       getTimePeriod() {
         const hour = new Date().getHours();
         if (hour >= 20 || hour < 5) return 'night';
@@ -361,6 +440,11 @@
         if (hour < 13.5) return 'noon';
         if (hour < 18) return 'afternoon';
         return 'evening';
+      }
+
+      isWorkTime() {
+        const hour = new Date().getHours();
+        return hour >= 8 && hour < 18;
       }
 
       showRandomGreeting() {
@@ -386,10 +470,20 @@
       }
 
       updateBubblePosition() {
-        const bubbleX = this.petSize / 2 - 100;
-        const bubbleY = 10;
+        const scale = this.petSize / 150;
+        
+        this.greetingBubble.style.fontSize = (12 * scale) + 'px';
+        this.greetingBubble.style.padding = (6 * scale) + 'px ' + (10 * scale) + 'px';
+        this.greetingBubble.style.borderRadius = (6 * scale) + 'px';
+        this.greetingBubble.style.maxWidth = (150 * scale) + 'px';
+        
+        const bubbleX = this.petSize / 2 - (75 * scale);
+        const bubbleY = 5 * scale;
         this.greetingBubble.style.left = bubbleX + 'px';
         this.greetingBubble.style.top = bubbleY + 'px';
+        
+        const arrowSize = 6 * scale;
+        this.greetingBubble.style.setProperty('--arrow-size', arrowSize + 'px');
       }
     }
 
