@@ -1,10 +1,11 @@
 {
-  "current_pet": "totoro",
+  "current_pet": "totoro-v2",
   "interval_seconds": 20,
   "display_duration_seconds": 3,
   "move_speed": 3,
   "idle_timeout_seconds": 10,
   "pet_size": 200,
+  "bottom_margin": 50,
   "animation_interval_ms": 300,
   "greetings": {
     "morning": [

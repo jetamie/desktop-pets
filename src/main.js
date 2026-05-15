@@ -52,8 +52,9 @@ function createWindow() {
   const displays = screen.getAllDisplays();
   const primaryDisplay = screen.getPrimaryDisplay();
   const { width: screenWidth, height: screenHeight } = primaryDisplay.size;
+  const bottomMargin = greetingsConfig?.bottom_margin || 40;
 
-  mainWindow.setPosition(screenWidth - petSize - 20, screenHeight - petSize - 20);
+  mainWindow.setPosition(screenWidth - petSize - 20, screenHeight - petSize - bottomMargin);
 
   mainWindow.loadFile(path.join(__dirname, '..', 'index.html'));
 

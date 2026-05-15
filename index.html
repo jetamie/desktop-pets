@@ -172,12 +172,13 @@
           this.animationInterval = this.config.animation_interval_ms || 150;
           this.greetingInterval = (this.config.interval_seconds || 30) * 1000;
           this.greetingDuration = (this.config.display_duration_seconds || 5) * 1000;
+          this.bottomMargin = this.config.bottom_margin || 20;
         }
 
         this.canvas.width = this.petSize;
         this.canvas.height = this.petSize;
 
-        this.petY = window.screen.height - this.petSize;
+        this.petY = window.screen.height - this.petSize - this.bottomMargin;
         
         if (this.isWorkTime()) {
           this.petX = this.calculateTimePosition();
@@ -297,10 +298,10 @@
 
         if (this.isWorkTime()) {
           this.moveTargetX = this.calculateTimePosition();
-          this.moveTargetY = window.screen.height - this.petSize;
+          this.moveTargetY = window.screen.height - this.petSize - this.bottomMargin;
         } else {
           this.moveTargetX = Math.random() * (window.screen.width - this.petSize);
-          this.moveTargetY = Math.random() * (window.screen.height - this.petSize);
+          this.moveTargetY = Math.random() * (window.screen.height - this.petSize - this.bottomMargin);
         }
 
         setTimeout(() => {
@@ -369,7 +370,7 @@
         this.isMoving = true;
 
         this.moveTargetX = Math.random() * (window.screen.width - this.petSize);
-        this.moveTargetY = Math.random() * (window.screen.height - this.petSize);
+        this.moveTargetY = Math.random() * (window.screen.height - this.petSize - this.bottomMargin);
       }
 
       timeModeMove() {
@@ -379,7 +380,7 @@
         this.currentState = 'walk';
         this.isMoving = true;
         this.moveTargetX = targetX;
-        this.moveTargetY = screenHeight - this.petSize;
+        this.moveTargetY = screenHeight - this.petSize - this.bottomMargin;
       }
 
       calculateTimePosition() {
@@ -439,7 +440,7 @@
         
         if (hour >= 20 || hour < 5) return 'night';
         if (hour < 11 || (hour === 11 && now.getMinutes() < 30)) return 'morning';
-        if (hour < 13 || (hour === 13 && now.getMinutes() < 30)) return 'noon';
+        if (hour < 12 || (hour === 12 && now.getMinutes() < 30)) return 'noon';
         if (hour < 18) return 'afternoon';
         return 'evening';
       }
