@@ -4,15 +4,15 @@ const fs = require('fs');
 
 let mainWindow = null;
 
-function loadGreetingsConfig() {
-  const configPath = path.join(__dirname, '..', 'config', 'greetings.json');
+function loadConfig() {
+  const configPath = path.join(__dirname, '..', 'config', 'config.json');
   try {
     if (fs.existsSync(configPath)) {
       const data = fs.readFileSync(configPath, 'utf-8');
       return JSON.parse(data);
     }
   } catch (e) {
-    console.error('Failed to load greetings config:', e);
+    console.error('Failed to load config:', e);
   }
   return null;
 }
@@ -31,8 +31,8 @@ function loadPetConfig(petName) {
 }
 
 function createWindow() {
-  const greetingsConfig = loadGreetingsConfig();
-  const petSize = greetingsConfig?.pet_size || 64;
+  const config = loadConfig();
+  const petSize = config?.pet_size || 64;
 
   mainWindow = new BrowserWindow({
     width: petSize,
@@ -52,7 +52,7 @@ function createWindow() {
   const displays = screen.getAllDisplays();
   const primaryDisplay = screen.getPrimaryDisplay();
   const { width: screenWidth, height: screenHeight } = primaryDisplay.size;
-  const bottomMargin = greetingsConfig?.bottom_margin || 40;
+  const bottomMargin = config?.bottom_margin || 40;
 
   mainWindow.setPosition(screenWidth - petSize - 20, screenHeight - petSize - bottomMargin);
 
@@ -63,7 +63,7 @@ function createWindow() {
   });
 
   console.log('Window created successfully');
-  console.log('Greetings config:', greetingsConfig);
+  console.log('Config:', config);
 }
 
 function createMenu() {
@@ -97,8 +97,8 @@ app.on('window-all-closed', () => {
   }
 });
 
-ipcMain.handle('get-greetings-config', () => {
-  return loadGreetingsConfig();
+ipcMain.handle('get-config', () => {
+  return loadConfig();
 });
 
 ipcMain.handle('get-pet-config', (event, petName) => {

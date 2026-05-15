@@ -7,6 +7,43 @@
   "pet_size": 200,
   "bottom_margin": 50,
   "animation_interval_ms": 300,
+  "game_modes": {
+    "default": "wander",
+    "schedules": [
+      {
+        "mode": "timeline",
+        "start_time": "08:00",
+        "end_time": "18:00"
+      },
+      {
+        "mode": "wander",
+        "start_time": "18:00",
+        "end_time": "22:00"
+      }
+    ],
+    "modes": {
+      "wander": {
+        "name": "闲逛模式",
+        "description": "宠物在屏幕上随机移动"
+      },
+      "timeline": {
+        "name": "时间轴模式",
+        "description": "宠物根据实时时间在屏幕底部从右向左移动",
+        "config": {
+          "start_x": "right",
+          "end_x": "left",
+          "y_position": "bottom"
+        }
+      },
+      "edge": {
+        "name": "边路模式",
+        "description": "宠物沿着屏幕边缘移动",
+        "config": {
+          "path": "bottom->left->top->right->bottom"
+        }
+      }
+    }
+  },
   "greetings": {
     "morning": [
       "早上好！新的一天开始啦！",

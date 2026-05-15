@@ -1,7 +1,7 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('electronAPI', {
-  getGreetingsConfig: () => ipcRenderer.invoke('get-greetings-config'),
+  getConfig: () => ipcRenderer.invoke('get-config'),
   getPetConfig: (petName) => ipcRenderer.invoke('get-pet-config', petName),
   getPetAssetsPath: () => ipcRenderer.invoke('get-pet-assets-path'),
   quitApp: () => ipcRenderer.invoke('quit-app'),

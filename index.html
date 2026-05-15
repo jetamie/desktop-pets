@@ -103,6 +103,47 @@
   </div>
 
   <script>
+    class GameModeManager {
+      constructor(config) {
+        this.config = config || {};
+        this.gameModesConfig = this.config.game_modes || {};
+        this.schedules = this.gameModesConfig.schedules || [];
+        this.modes = this.gameModesConfig.modes || {};
+        this.defaultMode = this.gameModesConfig.default || 'wander';
+      }
+
+      getCurrentMode() {
+        const now = new Date();
+        const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+        for (const schedule of this.schedules) {
+          const startMinutes = this.timeToMinutes(schedule.start_time);
+          const endMinutes = this.timeToMinutes(schedule.end_time);
+
+          if (currentMinutes >= startMinutes && currentMinutes < endMinutes) {
+            return {
+              name: schedule.mode,
+              config: this.modes[schedule.mode] || {}
+            };
+          }
+        }
+
+        return {
+          name: this.defaultMode,
+          config: this.modes[this.defaultMode] || {}
+        };
+      }
+
+      timeToMinutes(timeStr) {
+        const [hours, minutes] = timeStr.split(':').map(Number);
+        return hours * 60 + minutes;
+      }
+
+      getModeConfig(modeName) {
+        return this.modes[modeName] || {};
+      }
+    }
+
     class DesktopPet {
       constructor() {
         this.canvas = document.getElementById('pet-canvas');
@@ -162,7 +203,7 @@
       }
 
       async init() {
-        this.config = await window.electronAPI.getGreetingsConfig();
+        this.config = await window.electronAPI.getConfig();
         this.petAssetsPath = await window.electronAPI.getPetAssetsPath();
 
         if (this.config) {
@@ -173,6 +214,8 @@
           this.greetingInterval = (this.config.interval_seconds || 30) * 1000;
           this.greetingDuration = (this.config.display_duration_seconds || 5) * 1000;
           this.bottomMargin = this.config.bottom_margin || 20;
+          
+          this.gameModeManager = new GameModeManager(this.config);
         }
 
         this.canvas.width = this.petSize;
@@ -296,9 +339,24 @@
         this.currentFrame = 0;
         this.isMoving = false;
 
-        if (this.isWorkTime()) {
-          this.moveTargetX = this.calculateTimePosition();
-          this.moveTargetY = window.screen.height - this.petSize - this.bottomMargin;
+        const currentMode = this.gameModeManager?.getCurrentMode();
+        if (currentMode) {
+          switch (currentMode.name) {
+            case 'timeline':
+              this.moveTargetX = this.calculateTimePosition();
+              this.moveTargetY = window.screen.height - this.petSize - this.bottomMargin;
+              break;
+            case 'edge':
+              const edgeConfig = this.gameModeManager.getModeConfig('edge');
+              this.edgeModeMove(edgeConfig);
+              this.isMoving = true;
+              break;
+            case 'wander':
+            default:
+              this.moveTargetX = Math.random() * (window.screen.width - this.petSize);
+              this.moveTargetY = Math.random() * (window.screen.height - this.petSize - this.bottomMargin);
+              break;
+          }
         } else {
           this.moveTargetX = Math.random() * (window.screen.width - this.petSize);
           this.moveTargetY = Math.random() * (window.screen.height - this.petSize - this.bottomMargin);
@@ -324,10 +382,13 @@
           this.petY = this.moveTargetY;
           window.electronAPI.setWindowPosition(this.petX, this.petY);
           
-          if (this.isWorkTime()) {
+          const currentMode = this.gameModeManager?.getCurrentMode()?.name;
+          if (currentMode === 'timeline') {
             this.moveTargetX = this.calculateTimePosition();
             this.isMoving = true;
             this.currentState = 'walk';
+          } else if (currentMode === 'edge') {
+            this.edgeModeMove(this.gameModeManager.getModeConfig('edge'));
           } else {
             this.isMoving = false;
             this.currentState = 'idle';
@@ -358,10 +419,22 @@
       autoMove() {
         if (this.isMoving || this.currentState === 'jump') return;
 
-        if (this.isWorkTime()) {
-          this.timeModeMove();
-        } else {
-          this.wanderModeMove();
+        const currentMode = this.gameModeManager.getCurrentMode();
+        this.executeModeMove(currentMode);
+      }
+
+      executeModeMove(mode) {
+        switch (mode.name) {
+          case 'timeline':
+            this.timeModeMove();
+            break;
+          case 'edge':
+            this.edgeModeMove(mode.config);
+            break;
+          case 'wander':
+          default:
+            this.wanderModeMove();
+            break;
         }
       }
 
@@ -381,6 +454,49 @@
         this.isMoving = true;
         this.moveTargetX = targetX;
         this.moveTargetY = screenHeight - this.petSize - this.bottomMargin;
+      }
+
+      edgeModeMove(modeConfig) {
+        const path = modeConfig?.config?.path || 'bottom->left->top->right->bottom';
+        const pathSegments = path.split('->');
+        
+        if (!this.currentEdgeIndex) {
+          this.currentEdgeIndex = 0;
+        }
+        
+        const screenWidth = window.screen.width;
+        const screenHeight = window.screen.height;
+        
+        let targetX, targetY;
+        
+        switch (pathSegments[this.currentEdgeIndex]) {
+          case 'bottom':
+            targetX = Math.random() * (screenWidth - this.petSize);
+            targetY = screenHeight - this.petSize - this.bottomMargin;
+            break;
+          case 'left':
+            targetX = 0;
+            targetY = Math.random() * (screenHeight - this.petSize - this.bottomMargin);
+            break;
+          case 'top':
+            targetX = Math.random() * (screenWidth - this.petSize);
+            targetY = 0;
+            break;
+          case 'right':
+            targetX = screenWidth - this.petSize;
+            targetY = Math.random() * (screenHeight - this.petSize - this.bottomMargin);
+            break;
+          default:
+            targetX = Math.random() * (screenWidth - this.petSize);
+            targetY = screenHeight - this.petSize - this.bottomMargin;
+        }
+        
+        this.currentState = 'walk';
+        this.isMoving = true;
+        this.moveTargetX = targetX;
+        this.moveTargetY = targetY;
+        
+        this.currentEdgeIndex = (this.currentEdgeIndex + 1) % pathSegments.length;
       }
 
       calculateTimePosition() {

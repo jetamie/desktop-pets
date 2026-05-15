@@ -37,33 +37,13 @@ npm run dist:win
 npm run dist:mac
 ```
 
-### 方式二：Python 版本
-
-**安装依赖**
-```bash
-pip install PyQt5 Pillow
-```
-
-**运行**
-```bash
-python3 desktop_pet.py
-```
-
-**打包（可选）**
-```bash
-# 使用 PyInstaller
-pip install pyinstaller
-pyinstaller --onefile --windowed desktop_pet.py
-```
-
 ## 📁 项目结构
 
 ```
 desktop-pets/
 ├── src/
 │   ├── main.js          # Electron 主进程
-│   ├── preload.js       # Electron 预加载脚本
-│   └── desktop_pet.py   # Python 版本主文件
+│   └── preload.js       # Electron 预加载脚本
 ├── index.html           # Electron 渲染进程
 ├── assets/
 │   └── pets/            # 宠物素材目录
@@ -82,7 +62,7 @@ desktop-pets/
 
 ## 📝 配置说明
 
-### 主配置文件 (`config/greetings.json`)
+### 主配置文件 (`config/config.json`)
 
 ```json
 {
@@ -92,7 +72,20 @@ desktop-pets/
   "move_speed": 3,
   "idle_timeout_seconds": 5,
   "pet_size": 128,
+  "bottom_margin": 20,
   "animation_interval_ms": 150,
+  "game_modes": {
+    "default": "wander",
+    "schedules": [
+      { "mode": "timeline", "start_time": "08:00", "end_time": "18:00" },
+      { "mode": "edge", "start_time": "18:00", "end_time": "22:00" }
+    ],
+    "modes": {
+      "wander": { "name": "闲逛模式", "description": "宠物随机移动" },
+      "timeline": { "name": "时间轴模式", "description": "根据时间从右向左移动" },
+      "edge": { "name": "边路模式", "description": "沿屏幕边缘移动", "config": { "path": "bottom->left->top->right->bottom" } }
+    }
+  },
   "greetings": {
     "morning": ["早上好！", "今天也要加油哦！"],
     "noon": ["该吃午饭啦！", "休息一下吧~"],
@@ -113,7 +106,59 @@ desktop-pets/
 | `move_speed` | 移动速度（像素/帧） | 3 |
 | `idle_timeout_seconds` | 空闲自动移动超时（秒） | 5 |
 | `pet_size` | 宠物大小（像素） | 128 |
+| `bottom_margin` | 距离屏幕底部的间距（像素） | 20 |
 | `animation_interval_ms` | 动画帧间隔（毫秒） | 150 |
+
+### 玩法模式配置
+
+#### 模式类型
+
+| 模式名称 | 说明 |
+|----------|------|
+| `wander` | 闲逛模式 - 宠物随机移动 |
+| `timeline` | 时间轴模式 - 宠物根据实时时间从右向左移动 |
+| `edge` | 边路模式 - 宠物沿屏幕边缘循环移动 |
+
+#### 时间段调度
+
+通过 `game_modes.schedules` 配置不同时间段使用的模式：
+
+```json
+{
+  "game_modes": {
+    "default": "wander",
+    "schedules": [
+      { "mode": "timeline", "start_time": "08:00", "end_time": "18:00" },
+      { "mode": "edge", "start_time": "18:00", "end_time": "22:00" }
+    ]
+  }
+}
+```
+
+**说明：**
+- `default` - 默认模式（未匹配任何时间段时使用）
+- `schedules` - 时间段调度列表
+- `start_time`/`end_time` - 时间段（格式：HH:MM）
+
+#### 边路模式路径配置
+
+边路模式支持自定义移动路径：
+
+```json
+{
+  "edge": {
+    "config": {
+      "path": "bottom->left->top->right->bottom"
+    }
+  }
+}
+```
+
+**支持的路径节点：**
+- `bottom` - 底部边缘
+- `left` - 左侧边缘
+- `top` - 顶部边缘
+- `right` - 右侧边缘
 
 ### 添加自定义宠物
 
@@ -148,12 +193,6 @@ desktop-pets/
 - **语言**: JavaScript
 - **UI**: HTML5 Canvas
 - **构建工具**: electron-builder
-
-### Python 版本
-- **框架**: PyQt5
-- **语言**: Python 3
-- **图像处理**: Pillow
-- **打包工具**: PyInstaller
 
 ## 📄 许可证
 
