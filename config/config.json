@@ -2,8 +2,8 @@
   "current_pet": "totoro-v2",
   "interval_seconds": 20,
   "display_duration_seconds": 3,
-  "move_speed": 3,
-  "idle_timeout_seconds": 10,
+  "move_speed": 20,
+  "idle_timeout_seconds": 5,
   "pet_size": 200,
   "bottom_margin": 50,
   "animation_interval_ms": 300,
@@ -11,12 +11,12 @@
     "default": "wander",
     "schedules": [
       {
-        "mode": "timeline",
+        "mode": "edge",
         "start_time": "08:00",
         "end_time": "18:00"
       },
       {
-        "mode": "wander",
+        "mode": "edge",
         "start_time": "18:00",
         "end_time": "22:00"
       }
@@ -39,7 +39,7 @@
         "name": "边路模式",
         "description": "宠物沿着屏幕边缘移动",
         "config": {
-          "path": "bottom->left->top->right->bottom"
+          "path": "right->bottom->left->top->top_to_right->right"
         }
       }
     }

@@ -164,6 +164,8 @@
         this.isMoving = false;
         this.moveTargetX = 0;
         this.moveTargetY = 0;
+        this.rotation = 0;
+        this.flipHorizontal = false;
         this.moveSpeed = 3;
 
         this.idleTimer = null;
@@ -223,8 +225,11 @@
 
         this.petY = window.screen.height - this.petSize - this.bottomMargin;
         
-        if (this.isWorkTime()) {
+        const currentMode = this.gameModeManager?.getCurrentMode()?.name;
+        if (currentMode === 'timeline') {
           this.petX = this.calculateTimePosition();
+        } else if (currentMode === 'edge') {
+          this.petX = window.screen.width - this.petSize - 20;
         } else {
           this.petX = window.screen.width - this.petSize - 20;
         }
@@ -287,7 +292,8 @@
         this.draw();
 
         if (this.isMoving) {
-          if (this.isWorkTime()) {
+          const currentMode = this.gameModeManager?.getCurrentMode()?.name;
+          if (currentMode === 'timeline') {
             this.moveTargetX = this.calculateTimePosition();
           }
           this.moveTowardsTarget();
@@ -306,7 +312,23 @@
         this.ctx.clearRect(0, 0, this.petSize, this.petSize);
         const currentImg = stateFrames[this.currentFrame];
         if (currentImg && currentImg.complete) {
-          this.ctx.drawImage(currentImg, 0, 0, this.petSize, this.petSize);
+          if (this.rotation !== 0 || this.flipHorizontal) {
+            this.ctx.save();
+            this.ctx.translate(this.petSize / 2, this.petSize / 2);
+            
+            if (this.flipHorizontal) {
+              this.ctx.scale(-1, 1);
+            }
+            
+            if (this.rotation !== 0) {
+              this.ctx.rotate((this.rotation * Math.PI) / 180);
+            }
+            
+            this.ctx.drawImage(currentImg, -this.petSize / 2, -this.petSize / 2, this.petSize, this.petSize);
+            this.ctx.restore();
+          } else {
+            this.ctx.drawImage(currentImg, 0, 0, this.petSize, this.petSize);
+          }
         }
       }
 
@@ -338,33 +360,39 @@
         this.currentState = 'jump';
         this.currentFrame = 0;
         this.isMoving = false;
-
-        const currentMode = this.gameModeManager?.getCurrentMode();
-        if (currentMode) {
-          switch (currentMode.name) {
+        const currentMode = this.gameModeManager?.getCurrentMode()?.name || '';
+        switch (currentMode) {
             case 'timeline':
               this.moveTargetX = this.calculateTimePosition();
               this.moveTargetY = window.screen.height - this.petSize - this.bottomMargin;
               break;
             case 'edge':
-              const edgeConfig = this.gameModeManager.getModeConfig('edge');
-              this.edgeModeMove(edgeConfig);
-              this.isMoving = true;
               break;
             case 'wander':
             default:
-              this.moveTargetX = Math.random() * (window.screen.width - this.petSize);
-              this.moveTargetY = Math.random() * (window.screen.height - this.petSize - this.bottomMargin);
+              const targetX = Math.random() * (window.screen.width - this.petSize);
+              const targetY = Math.random() * (window.screen.height - this.petSize - this.bottomMargin);
+              
+              const dx = targetX - this.petX;
+              if (dx > 10) {
+                this.flipHorizontal = true;
+              } else if (dx < -10) {
+                this.flipHorizontal = false;
+              }
+              
+              this.moveTargetX = targetX;
+              this.moveTargetY = targetY;
               break;
           }
-        } else {
-          this.moveTargetX = Math.random() * (window.screen.width - this.petSize);
-          this.moveTargetY = Math.random() * (window.screen.height - this.petSize - this.bottomMargin);
-        }
+        
 
         setTimeout(() => {
+          const currentMode = this.gameModeManager?.getCurrentMode()?.name;
           if (!this.frames['walk'] || this.frames['walk'].length === 0) {
             this.currentState = 'idle';
+          } else if (currentMode === 'edge') {
+            this.currentState = 'idle';   // 边路模式：跳跃后保持空闲状态
+            this.isMoving = false;
           } else {
             this.currentState = 'walk';
             this.isMoving = true;
@@ -442,13 +470,30 @@
         this.currentState = 'walk';
         this.isMoving = true;
 
-        this.moveTargetX = Math.random() * (window.screen.width - this.petSize);
-        this.moveTargetY = Math.random() * (window.screen.height - this.petSize - this.bottomMargin);
+        const targetX = Math.random() * (window.screen.width - this.petSize);
+        const targetY = Math.random() * (window.screen.height - this.petSize - this.bottomMargin);
+
+        const dx = targetX - this.petX;
+        if (dx > 10) {
+          this.flipHorizontal = true;
+        } else if (dx < -10) {
+          this.flipHorizontal = false;
+        }
+
+        this.moveTargetX = targetX;
+        this.moveTargetY = targetY;
       }
 
       timeModeMove() {
         const targetX = this.calculateTimePosition();
         const screenHeight = window.screen.height;
+        
+        const dx = targetX - this.petX;
+        if (dx > 10) {
+          this.rotation = 180;
+        } else if (dx < -10) {
+          this.rotation = 0;
+        }
         
         this.currentState = 'walk';
         this.isMoving = true;
@@ -457,7 +502,7 @@
       }
 
       edgeModeMove(modeConfig) {
-        const path = modeConfig?.config?.path || 'bottom->left->top->right->bottom';
+        const path = modeConfig?.config?.path || 'right->bottom->left->top->right';
         const pathSegments = path.split('->');
         
         if (!this.currentEdgeIndex) {
@@ -470,25 +515,35 @@
         let targetX, targetY;
         
         switch (pathSegments[this.currentEdgeIndex]) {
-          case 'bottom':
-            targetX = Math.random() * (screenWidth - this.petSize);
+          case 'right':
+            targetX = screenWidth - this.petSize;
             targetY = screenHeight - this.petSize - this.bottomMargin;
+            this.rotation = 0;
+            break;
+          case 'bottom':
+            targetX = 0;
+            targetY = screenHeight - this.petSize - this.bottomMargin;
+            this.rotation = 0;
             break;
           case 'left':
             targetX = 0;
-            targetY = Math.random() * (screenHeight - this.petSize - this.bottomMargin);
+            targetY = 0;
+            this.rotation = 90;
             break;
           case 'top':
-            targetX = Math.random() * (screenWidth - this.petSize);
-            targetY = 0;
-            break;
-          case 'right':
             targetX = screenWidth - this.petSize;
-            targetY = Math.random() * (screenHeight - this.petSize - this.bottomMargin);
+            targetY = 0;
+            this.rotation = 180;
+            break;
+          case 'top_to_right':
+            targetX = screenWidth - this.petSize;
+            targetY = screenHeight - this.petSize - this.bottomMargin;
+            this.rotation = 270;
             break;
           default:
-            targetX = Math.random() * (screenWidth - this.petSize);
+            targetX = screenWidth - this.petSize;
             targetY = screenHeight - this.petSize - this.bottomMargin;
+            this.rotation = 0;
         }
         
         this.currentState = 'walk';
@@ -559,11 +614,6 @@
         if (hour < 12 || (hour === 12 && now.getMinutes() < 30)) return 'noon';
         if (hour < 18) return 'afternoon';
         return 'evening';
-      }
-
-      isWorkTime() {
-        const hour = new Date().getHours();
-        return hour >= 8 && hour < 18;
       }
 
       showRandomGreeting() {
