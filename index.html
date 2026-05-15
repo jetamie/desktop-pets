@@ -356,11 +356,14 @@
 
       doJump() {
         if (this.currentState === 'jump') return;
-
+        const currentMode = this.gameModeManager?.getCurrentMode()?.name || '';
+        if (currentMode === 'edge') {
+          return;
+        }
+        // 这几个状态会影响路线行为
         this.currentState = 'jump';
         this.currentFrame = 0;
         this.isMoving = false;
-        const currentMode = this.gameModeManager?.getCurrentMode()?.name || '';
         switch (currentMode) {
             case 'timeline':
               this.moveTargetX = this.calculateTimePosition();
@@ -387,12 +390,8 @@
         
 
         setTimeout(() => {
-          const currentMode = this.gameModeManager?.getCurrentMode()?.name;
           if (!this.frames['walk'] || this.frames['walk'].length === 0) {
             this.currentState = 'idle';
-          } else if (currentMode === 'edge') {
-            this.currentState = 'idle';   // 边路模式：跳跃后保持空闲状态
-            this.isMoving = false;
           } else {
             this.currentState = 'walk';
             this.isMoving = true;
@@ -415,7 +414,7 @@
             this.moveTargetX = this.calculateTimePosition();
             this.isMoving = true;
             this.currentState = 'walk';
-          } else if (currentMode === 'edge') {
+          } else if (currentMode === 'edge' && this.currentState !== 'jump') {
             this.edgeModeMove(this.gameModeManager.getModeConfig('edge'));
           } else {
             this.isMoving = false;
@@ -558,8 +557,23 @@
         const now = new Date();
         const currentMinutes = now.getHours() * 60 + now.getMinutes();
         
-        const workStartMinutes = 8 * 60;
-        const workEndMinutes = 18 * 60;
+        let workStartMinutes = 8 * 60;
+        let workEndMinutes = 18 * 60;
+        
+        const schedules = this.config?.game_modes?.schedules || [];
+        const timelineSchedule = schedules.find(s => s.mode === 'timeline');
+        
+        if (timelineSchedule) {
+          if (timelineSchedule.start_time) {
+            const [startHour, startMin] = timelineSchedule.start_time.split(':').map(Number);
+            workStartMinutes = startHour * 60 + startMin;
+          }
+          if (timelineSchedule.end_time) {
+            const [endHour, endMin] = timelineSchedule.end_time.split(':').map(Number);
+            workEndMinutes = endHour * 60 + endMin;
+          }
+        }
+        
         const totalWorkMinutes = workEndMinutes - workStartMinutes;
         
         let progress;
